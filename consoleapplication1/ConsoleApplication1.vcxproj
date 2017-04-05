@@ -1,0 +1,160 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{60EBC5C5-D770-478A-8062-E6DF5EB0A156}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>ConsoleApplication1</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>C:\Program Files\PCL 1.8.0\3rdParty\Eigen\eigen3;C:\Program Files\PCL 1.8.0\3rdParty\VTK\include\vtk-7.0;C:\Program Files\PCL 1.8.0\3rdParty\Qhull\include;C:\Program Files\PCL 1.8.0\3rdParty\FLANN\include;C:\Program Files\PCL 1.8.0\3rdParty\Boost\include\boost-1_61;C:\Program Files\PCL 1.8.0\include\pcl-1.8;C:\Users\Vicky\Downloads\opencv\build\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\PCL 1.8.0\lib;C:\Program Files\PCL 1.8.0\3rdParty\VTK\lib;C:\Program Files\PCL 1.8.0\3rdParty\FLANN\lib;C:\Program Files\PCL 1.8.0\3rdParty\Boost\lib;C:\Users\Vicky\Downloads\opencv\build\x64\vc14\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;opencv_world320d.lib;pcl_common_debug.lib;pcl_common_release.lib;pcl_io_debug.lib;pcl_io_release.lib;pcl_visualization_debug.lib;pcl_visualization_release.lib;vtkalglib-7.0-gd.lib;vtkChartsCore-7.0-gd.lib;vtkCommonColor-7.0-gd.lib;vtkCommonComputationalGeometry-7.0-gd.lib;vtkCommonCore-7.0-gd.lib;vtkCommonDataModel-7.0-gd.lib;vtkCommonExecutionModel-7.0-gd.lib;vtkCommonMath-7.0-gd.lib;vtkCommonMisc-7.0-gd.lib;vtkCommonSystem-7.0-gd.lib;vtkCommonTransforms-7.0-gd.lib;vtkDICOMParser-7.0-gd.lib;vtkDomainsChemistry-7.0-gd.lib;vtkexoIIc-7.0-gd.lib;vtkexpat-7.0-gd.lib;vtkFiltersAMR-7.0-gd.lib;vtkFiltersCore-7.0-gd.lib;vtkFiltersExtraction-7.0-gd.lib;vtkFiltersFlowPaths-7.0-gd.lib;vtkFiltersGeneral-7.0-gd.lib;vtkFiltersGeneric-7.0-gd.lib;vtkFiltersGeometry-7.0-gd.lib;vtkFiltersHybrid-7.0-gd.lib;vtkFiltersHypertree-7.0-gd.lib;vtkFiltersImaging-7.0-gd.lib;vtkFiltersModeling-7.0-gd.lib;vtkFiltersParallel-7.0-gd.lib;vtkFiltersParallelImaging-7.0-gd.lib;vtkFiltersProgrammable-7.0-gd.lib;vtkFiltersSelection-7.0-gd.lib;vtkFiltersSMP-7.0-gd.lib;vtkFiltersSources-7.0-gd.lib;vtkFiltersStatistics-7.0-gd.lib;vtkFiltersTexture-7.0-gd.lib;vtkFiltersVerdict-7.0-gd.lib;vtkfreetype-7.0-gd.lib;vtkGeovisCore-7.0-gd.lib;vtkgl2ps-7.0-gd.lib;vtkhdf5_hl-7.0-gd.lib;vtkhdf5-7.0-gd.lib;vtkImagingColor-7.0-gd.lib;vtkImagingFourier-7.0-gd.lib;vtkImagingGeneral-7.0-gd.lib;vtkImagingHybrid-7.0-gd.lib;vtkImagingMath-7.0-gd.lib;vtkImagingMorphological-7.0-gd.lib;vtkImagingStatistics-7.0-gd.lib;vtkImagingSources-7.0-gd.lib;vtkImagingStencil-7.0-gd.lib;vtkInfovisCore-7.0-gd.lib;vtkInfovisLayout-7.0-gd.lib;vtkInteractionImage-7.0-gd.lib;vtkInteractionWidgets-7.0-gd.lib;vtkInteractionStyle-7.0-gd.lib;vtkIOAMR-7.0-gd.lib;vtkIOCore-7.0-gd.lib;vtkIOEnSight-7.0-gd.lib;vtkIOExodus-7.0-gd.lib;vtkIOExport-7.0-gd.lib;vtkIOGeometry-7.0-gd.lib;vtkIOImage-7.0-gd.lib;vtkIOImport-7.0-gd.lib;vtkIOInfovis-7.0-gd.lib;vtkIOLegacy-7.0-gd.lib;vtkIOLSDyna-7.0-gd.lib;vtkIOMINC-7.0-gd.lib;vtkIOMovie-7.0-gd.lib;vtkIONetCDF-7.0-gd.lib;vtkIOParallel-7.0-gd.lib;vtkIOParallelXML-7.0-gd.lib;vtkIOPLY-7.0-gd.lib;vtkIOSQL-7.0-gd.lib;vtkIOVideo-7.0-gd.lib;vtkIOXML-7.0-gd.lib;vtkIOXMLParser-7.0-gd.lib;vtkjpeg-7.0-gd.lib;vtkjsoncpp-7.0-gd.lib;vtklibxml2-7.0-gd.lib;vtkmetaio-7.0-gd.lib;vtkNetCDF_cxx-7.0-gd.lib;vtkNetCDF-7.0-gd.lib;vtkoggtheora-7.0-gd.lib;vtkParallelCore-7.0-gd.lib;vtkpng-7.0-gd.lib;vtkproj4-7.0-gd.lib;vtkRenderingAnnotation-7.0-gd.lib;vtkRenderingContext2D-7.0-gd.lib;vtkRenderingContextOpenGL-7.0-gd.lib;vtkRenderingCore-7.0-gd.lib;vtkRenderingFreeType-7.0-gd.lib;vtkRenderingGL2PS-7.0-gd.lib;vtkRenderingImage-7.0-gd.lib;vtkRenderingLabel-7.0-gd.lib;vtkRenderingLIC-7.0-gd.lib;vtkRenderingLOD-7.0-gd.lib;vtkRenderingOpenGL-7.0-gd.lib;vtkRenderingVolume-7.0-gd.lib;vtkRenderingVolumeOpenGL-7.0-gd.lib;vtksqlite-7.0-gd.lib;vtksys-7.0-gd.lib;vtktiff-7.0-gd.lib;vtkverdict-7.0-gd.lib;vtkViewsContext2D-7.0-gd.lib;vtkViewsCore-7.0-gd.lib;vtkViewsInfovis-7.0-gd.lib;vtkzlib-7.0-gd.lib;libboost_thread-vc140-mt-gd-1_61.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>C:\Program Files\PCL 1.8.0\3rdParty\Eigen\eigen3;C:\Program Files\PCL 1.8.0\3rdParty\VTK\include\vtk-7.0;C:\Program Files\PCL 1.8.0\3rdParty\Qhull\include;C:\Program Files\PCL 1.8.0\3rdParty\FLANN\include;C:\Program Files\PCL 1.8.0\3rdParty\Boost\include\boost-1_61;C:\Program Files\PCL 1.8.0\include\pcl-1.8;C:\Users\Vicky\Downloads\opencv\build\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\PCL 1.8.0\lib;C:\Program Files\PCL 1.8.0\3rdParty\VTK\lib;C:\Program Files\PCL 1.8.0\3rdParty\FLANN\lib;C:\Program Files\PCL 1.8.0\3rdParty\Boost\lib;C:\Users\Vicky\Downloads\opencv\build\x64\vc14\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;opencv_world320.lib;opencv_world320d.lib;pcl_common_debug.lib;pcl_common_release.lib;pcl_io_debug.lib;pcl_io_release.lib;pcl_visualization_debug.lib;pcl_visualization_release.lib;vtkalglib-7.0-gd.lib;vtkChartsCore-7.0-gd.lib;vtkCommonColor-7.0-gd.lib;vtkCommonComputationalGeometry-7.0-gd.lib;vtkCommonCore-7.0-gd.lib;vtkCommonDataModel-7.0-gd.lib;vtkCommonExecutionModel-7.0-gd.lib;vtkCommonMath-7.0-gd.lib;vtkCommonMisc-7.0-gd.lib;vtkCommonSystem-7.0-gd.lib;vtkCommonTransforms-7.0-gd.lib;vtkDICOMParser-7.0-gd.lib;vtkDomainsChemistry-7.0-gd.lib;vtkexoIIc-7.0-gd.lib;vtkexpat-7.0-gd.lib;vtkFiltersAMR-7.0-gd.lib;vtkFiltersCore-7.0-gd.lib;vtkFiltersExtraction-7.0-gd.lib;vtkFiltersFlowPaths-7.0-gd.lib;vtkFiltersGeneral-7.0-gd.lib;vtkFiltersGeneric-7.0-gd.lib;vtkFiltersGeometry-7.0-gd.lib;vtkFiltersHybrid-7.0-gd.lib;vtkFiltersHypertree-7.0-gd.lib;vtkFiltersImaging-7.0-gd.lib;vtkFiltersModeling-7.0-gd.lib;vtkFiltersParallel-7.0-gd.lib;vtkFiltersParallelImaging-7.0-gd.lib;vtkFiltersProgrammable-7.0-gd.lib;vtkFiltersSelection-7.0-gd.lib;vtkFiltersSMP-7.0-gd.lib;vtkFiltersSources-7.0-gd.lib;vtkFiltersStatistics-7.0-gd.lib;vtkFiltersTexture-7.0-gd.lib;vtkFiltersVerdict-7.0-gd.lib;vtkfreetype-7.0-gd.lib;vtkGeovisCore-7.0-gd.lib;vtkgl2ps-7.0-gd.lib;vtkhdf5_hl-7.0-gd.lib;vtkhdf5-7.0-gd.lib;vtkImagingColor-7.0-gd.lib;vtkImagingFourier-7.0-gd.lib;vtkImagingGeneral-7.0-gd.lib;vtkImagingHybrid-7.0-gd.lib;vtkImagingMath-7.0-gd.lib;vtkImagingMorphological-7.0-gd.lib;vtkImagingStatistics-7.0-gd.lib;vtkImagingSources-7.0-gd.lib;vtkImagingStencil-7.0-gd.lib;vtkInfovisCore-7.0-gd.lib;vtkInfovisLayout-7.0-gd.lib;vtkInteractionImage-7.0-gd.lib;vtkInteractionWidgets-7.0-gd.lib;vtkInteractionStyle-7.0-gd.lib;vtkIOAMR-7.0-gd.lib;vtkIOCore-7.0-gd.lib;vtkIOEnSight-7.0-gd.lib;vtkIOExodus-7.0-gd.lib;vtkIOExport-7.0-gd.lib;vtkIOGeometry-7.0-gd.lib;vtkIOImage-7.0-gd.lib;vtkIOImport-7.0-gd.lib;vtkIOInfovis-7.0-gd.lib;vtkIOLegacy-7.0-gd.lib;vtkIOLSDyna-7.0-gd.lib;vtkIOMINC-7.0-gd.lib;vtkIOMovie-7.0-gd.lib;vtkIONetCDF-7.0-gd.lib;vtkIOParallel-7.0-gd.lib;vtkIOParallelXML-7.0-gd.lib;vtkIOPLY-7.0-gd.lib;vtkIOSQL-7.0-gd.lib;vtkIOVideo-7.0-gd.lib;vtkIOXML-7.0-gd.lib;vtkIOXMLParser-7.0-gd.lib;vtkjpeg-7.0-gd.lib;vtkjsoncpp-7.0-gd.lib;vtklibxml2-7.0-gd.lib;vtkmetaio-7.0-gd.lib;vtkNetCDF_cxx-7.0-gd.lib;vtkNetCDF-7.0-gd.lib;vtkoggtheora-7.0-gd.lib;vtkParallelCore-7.0-gd.lib;vtkpng-7.0-gd.lib;vtkproj4-7.0-gd.lib;vtkRenderingAnnotation-7.0-gd.lib;vtkRenderingContext2D-7.0-gd.lib;vtkRenderingContextOpenGL-7.0-gd.lib;vtkRenderingCore-7.0-gd.lib;vtkRenderingFreeType-7.0-gd.lib;vtkRenderingGL2PS-7.0-gd.lib;vtkRenderingImage-7.0-gd.lib;vtkRenderingLabel-7.0-gd.lib;vtkRenderingLIC-7.0-gd.lib;vtkRenderingLOD-7.0-gd.lib;vtkRenderingOpenGL-7.0-gd.lib;vtkRenderingVolume-7.0-gd.lib;vtkRenderingVolumeOpenGL-7.0-gd.lib;vtksqlite-7.0-gd.lib;vtksys-7.0-gd.lib;vtktiff-7.0-gd.lib;vtkverdict-7.0-gd.lib;vtkViewsContext2D-7.0-gd.lib;vtkViewsCore-7.0-gd.lib;vtkViewsInfovis-7.0-gd.lib;vtkzlib-7.0-gd.lib;libboost_thread-vc140-mt-gd-1_61.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="Source.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
