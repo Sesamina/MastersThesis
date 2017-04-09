@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 		for (int i = 1; i < numLabels; i++) {
 			if (labelStats.at<int>(i, cv::CC_STAT_AREA) > 400) {
 				cv::Mat labelInfo = labelStats.row(i);
-				MatToPoinXYZ(thresholdedImage, labelInfo, number, point_cloud_ptr, thresholdedImage.rows, thresholdedImage.cols);
+				MatToPoinXYZ(filteredImage, labelInfo, number, point_cloud_ptr, thresholdedImage.rows, thresholdedImage.cols);
 			}
 		}
 
@@ -192,9 +192,9 @@ void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::Poi
 		if (!firstNotFound) {
 			//add the last point with intensity = 1 in row to the point cloud
 			pcl::PointXYZI point;
-			point.x = (float)j / width * 0.3f;
-			point.y = (float)lastPointPosition / height * 0.2f;
-			point.z = (float)z / volumeBScans * 0.3f;
+			point.x = (float)z / volumeBScans * 2.6f;
+			point.y = (float)j / height * 3.0f;
+			point.z = (float)lastPointPosition / width * 2.0f;
 			point.intensity = OpencVPointCloud.at<uchar>(j, lastPointPosition);
 			point_cloud_ptr->points.push_back(point);
 		}
