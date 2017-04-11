@@ -23,7 +23,10 @@
 #include <pcl/point_cloud.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/visualization/pcl_visualizer.h>
+#include<pcl/visualization/pcl_plotter.h>
 #include <pcl/visualization/image_viewer.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/features/cvfh.h>
 #include <boost/thread/thread.hpp>
 
 boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZI>::ConstPtr cloud, pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> rgb);
@@ -123,7 +126,7 @@ int main(int argc, char** argv)
 		cv::Mat labelledImage;
 		cv::Mat labelStats;
 		cv::Mat labelCentroids;
-		int numLabels = cv::connectedComponentsWithStats(thresholdedImage, labelledImage, labelStats, labelCentroids);
+		int numLabels = cv::connectedComponentsWithStats(filteredImage, labelledImage, labelStats, labelCentroids);
 
 		//for every label with more than 400 points process it further for adding points to the cloud
 		for (int i = 1; i < numLabels; i++) {
@@ -140,6 +143,42 @@ int main(int argc, char** argv)
 		countIm = countIm + 1;
 
 	}
+
+	// Object for storing the normals.
+	pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+	// Object for storing the CVFH descriptors.
+	pcl::PointCloud<pcl::VFHSignature308>::Ptr descriptors(new pcl::PointCloud<pcl::VFHSignature308>);
+	// Estimate the normals.
+	pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> normalEstimation;
+	normalEstimation.setInputCloud(point_cloud_ptr);
+	normalEstimation.setRadiusSearch(0.03);
+	pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZI>);
+	normalEstimation.setSearchMethod(kdtree);
+	normalEstimation.compute(*normals);
+	// CVFH estimation object.
+	pcl::CVFHEstimation<pcl::PointXYZI, pcl::Normal, pcl::VFHSignature308> cvfh;
+	cvfh.setInputCloud(point_cloud_ptr);
+	cvfh.setInputNormals(normals);
+	cvfh.setSearchMethod(kdtree);
+	// Set the maximum allowable deviation of the normals,
+	// for the region segmentation step.
+	cvfh.setEPSAngleThreshold(5.0 / 180.0 * M_PI); // 5 degrees.
+												   // Set the curvature threshold (maximum disparity between curvatures),
+												   // for the region segmentation step.
+	cvfh.setCurvatureThreshold(1.0);
+	// Set to true to normalize the bins of the resulting histogram,
+	// using the total number of points. Note: enabling it will make CVFH
+	// invariant to scale just like VFH, but the authors encourage the opposite.
+	cvfh.setNormalizeBins(false);
+
+	cvfh.compute(*descriptors);
+
+	// Plotter object.
+	pcl::visualization::PCLPlotter plotter;
+	// We need to set the size of the descriptor beforehand.
+	plotter.addFeatureHistogram(*descriptors, 308);
+
+	plotter.plot();
 
 	//open a viewer and show the cloud
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = simpleVis(point_cloud_ptr, rgb);
