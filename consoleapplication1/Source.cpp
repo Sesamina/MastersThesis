@@ -20,22 +20,28 @@
 #include "OCTDefs.hpp"
 
 #include <pcl/common/common_headers.h>
+#include <pcl/common/centroid.h>
 #include <pcl/point_cloud.h>
+#include <pcl/conversions.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/vtk_lib_io.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include<pcl/visualization/pcl_plotter.h>
+#include <pcl/visualization/pcl_plotter.h>
 #include <pcl/visualization/image_viewer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/cvfh.h>
+#include <pcl/features/crh.h>
+#include <pcl/recognition/crh_alignment.h>
+#include <pcl/registration/icp.h>
+
 #include <boost/thread/thread.hpp>
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZI>::ConstPtr cloud, pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> rgb);
-void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZI>::Ptr& point_cloud_ptr, int height, int width);
-void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer_void);
+boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud);
+void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZ>::Ptr& point_cloud_ptr, int height, int width);
 
 
-pcl::PointCloud<pcl::PointXYZI>::Ptr point_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> rgb(point_cloud_ptr, 192, 192, 192);
+pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+pcl::PointCloud<pcl::PointXYZ>::Ptr CAD_model_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
 bool waitKey = false;
 int volumeBScans = 128;
@@ -47,6 +53,7 @@ int main(int argc, char** argv)
 	std::string keys =
 		"{help h ?    |      | Display the program help.}"
 		"{@input      |      | Path to the directory containing recorded OCT frames.}"
+		"{@model      |      | Path and filename of the model to load.}"
 		;
 	cv::CommandLineParser parser(argc, argv, keys);
 	parser.about("Zeiss Interventional Imaging Research Solution");
@@ -55,7 +62,8 @@ int main(int argc, char** argv)
 		parser.printMessage();
 		exit(0);
 	}
-	std::string inputDirectory = parser.get<std::string>(0);
+	std::string inputDirectory = parser.get<std::string>("@input");
+	std::string modelPath = parser.get<std::string>("@model");
 
 	if (!parser.check())
 	{
@@ -90,6 +98,16 @@ int main(int argc, char** argv)
 		::FindClose(hFind);
 	}
 
+	//load CAD model (.stl)
+	pcl::PolygonMesh::Ptr CAD_model(new pcl::PolygonMesh);
+	pcl::io::loadPolygonFileSTL(modelPath, *CAD_model);
+	pcl::fromPCLPointCloud2(CAD_model->cloud, *CAD_model_cloud_ptr);
+
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> CADviewer = simpleVis(CAD_model_cloud_ptr);
+	CADviewer->spin();
+
+
+	//process OCT frames
 	int minFrameNumber = 0;
 	int maxFrameNumber = count;
 
@@ -144,61 +162,99 @@ int main(int argc, char** argv)
 
 	}
 
-	// Object for storing the normals.
-	pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
-	// Object for storing the CVFH descriptors.
-	pcl::PointCloud<pcl::VFHSignature308>::Ptr descriptors(new pcl::PointCloud<pcl::VFHSignature308>);
+	//open a viewer and show the generated point cloud after processing the frames
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = simpleVis(point_cloud_ptr);
+	viewer->spin();
+
 	// Estimate the normals.
-	pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> normalEstimation;
+	pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+	pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normalEstimation;
 	normalEstimation.setInputCloud(point_cloud_ptr);
 	normalEstimation.setRadiusSearch(0.03);
-	pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZI>);
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
 	normalEstimation.setSearchMethod(kdtree);
 	normalEstimation.compute(*normals);
-	// CVFH estimation object.
-	pcl::CVFHEstimation<pcl::PointXYZI, pcl::Normal, pcl::VFHSignature308> cvfh;
+
+	//compute centroid
+	Eigen::Vector4f centroid;
+	pcl::compute3DCentroid(*point_cloud_ptr, centroid);
+
+	// compute the clustered viewpoint feature histogram
+	pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors(new pcl::PointCloud<pcl::VFHSignature308>);
+	pcl::CVFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::VFHSignature308> cvfh;
 	cvfh.setInputCloud(point_cloud_ptr);
 	cvfh.setInputNormals(normals);
 	cvfh.setSearchMethod(kdtree);
-	// Set the maximum allowable deviation of the normals,
-	// for the region segmentation step.
 	cvfh.setEPSAngleThreshold(5.0 / 180.0 * M_PI); // 5 degrees.
-												   // Set the curvature threshold (maximum disparity between curvatures),
-												   // for the region segmentation step.
 	cvfh.setCurvatureThreshold(1.0);
-	// Set to true to normalize the bins of the resulting histogram,
-	// using the total number of points. Note: enabling it will make CVFH
-	// invariant to scale just like VFH, but the authors encourage the opposite.
 	cvfh.setNormalizeBins(false);
+	cvfh.compute(*cvfh_descriptors);
 
-	cvfh.compute(*descriptors);
+	// compute the camera roll histogram
+	pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors(new pcl::PointCloud<pcl::Histogram<90>>);
+	pcl::CRHEstimation<pcl::PointXYZ, pcl::Normal, pcl::Histogram<90>> crh;
+	crh.setInputCloud(point_cloud_ptr);
+	crh.setInputNormals(normals); 
+	crh.setCentroid(centroid);
+	crh.compute(*crh_descriptors);
 
-	// Plotter object.
+	// compute the roll angle
+	pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
+	alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_cloud_ptr);
+	// CRHAlignment works with Vector3f, not Vector4f.
+	//Eigen::Vector3f viewCentroid3f(CADCentroid[0], CADCentroid[1], CADCentroid[2]);
+	//Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
+	//alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
+
+	//// Compute the roll angle(s).
+	//std::vector<float> angles;
+	//alignment.computeRollAngle(*crh_descriptors, *CAD_crh_descriptors, angles);
+
+	//if (angles.size() > 0)
+	//{
+	//	std::cout << "List of angles where the histograms correlate:" << std::endl;
+
+	//	for (int i = 0; i < angles.size(); i++)
+	//	{
+	//		std::cout << "\t" << angles.at(i) << " degrees." << std::endl;
+	//	}
+	//}
+
+	// plot the histograms
 	pcl::visualization::PCLPlotter plotter;
-	// We need to set the size of the descriptor beforehand.
-	plotter.addFeatureHistogram(*descriptors, 308);
-
+	plotter.addFeatureHistogram(*cvfh_descriptors, 308);
 	plotter.plot();
+	pcl::visualization::PCLPlotter plotter2;
+	plotter2.addFeatureHistogram(*crh_descriptors, 308);
+	plotter2.plot();
 
-	//open a viewer and show the cloud
-	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = simpleVis(point_cloud_ptr, rgb);
-	viewer->updatePointCloud(point_cloud_ptr, rgb,  "sample cloud");
-	while (!viewer->wasStopped())
+	//perform iterative closest point
+	pcl::PointCloud<pcl::PointXYZ>::Ptr finalCloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> registration;
+	registration.setInputSource(CAD_model_cloud_ptr);
+	registration.setInputTarget(point_cloud_ptr);
+
+	registration.align(*finalCloud);
+	if (registration.hasConverged())
 	{
-		viewer->spinOnce(100);
-		boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+		std::cout << "ICP converged." << std::endl
+			<< "The score is " << registration.getFitnessScore() << std::endl;
+		std::cout << "Transformation matrix:" << std::endl;
+		std::cout << registration.getFinalTransformation() << std::endl;
 	}
+
 	return 0;
 }
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZI>::ConstPtr cloud, pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> rgb)
+boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud)
 {
 	// --------------------------------------------
 	// -----Open 3D viewer and add point cloud-----
 	// --------------------------------------------
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-	viewer->setBackgroundColor(0, 0, 0); 
-	viewer->addPointCloud<pcl::PointXYZI>(cloud, rgb, "sample cloud");
+	viewer->setBackgroundColor(0, 0, 0);
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> rgb_handler(cloud, 192, 192, 192);
+	viewer->addPointCloud<pcl::PointXYZ>(cloud, rgb_handler, "sample cloud");
 	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
 	viewer->addCoordinateSystem(1.0);
 	viewer->initCameraParameters();
@@ -206,7 +262,7 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<p
 	return (viewer);
 }
 
-void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZI>::Ptr& point_cloud_ptr, int height, int width)
+void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZ>::Ptr& point_cloud_ptr, int height, int width)
 {
 	//get the infos for the bounding box
 	int x = labelInfo.at<int>(0, cv::CC_STAT_LEFT);
@@ -230,11 +286,10 @@ void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::Poi
 		}
 		if (!firstNotFound) {
 			//add the last point with intensity = 1 in row to the point cloud
-			pcl::PointXYZI point;
+			pcl::PointXYZ point;
 			point.x = (float)z / volumeBScans * 2.6f;
 			point.y = (float)j / height * 3.0f;
 			point.z = (float)lastPointPosition / width * 2.0f;
-			point.intensity = OpencVPointCloud.at<uchar>(j, lastPointPosition);
 			point_cloud_ptr->points.push_back(point);
 		}
 	}
