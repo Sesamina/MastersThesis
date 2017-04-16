@@ -38,6 +38,8 @@
 
 boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud);
 void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZ>::Ptr& point_cloud_ptr, int height, int width);
+pcl::PointCloud<pcl::Normal>::Ptr computeNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr);
+pcl::PointCloud<pcl::VFHSignature308>::Ptr computeCVFH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals); pcl::PointCloud<pcl::Histogram<90>>::Ptr computeCRH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals, Eigen::Vector4f centroid);
 
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -53,7 +55,7 @@ int main(int argc, char** argv)
 	std::string keys =
 		"{help h ?    |      | Display the program help.}"
 		"{@input      |      | Path to the directory containing recorded OCT frames.}"
-		"{@model      |      | Path and filename of the model to load.}"
+		"{@model      |      | Path to the models to load.}"
 		;
 	cv::CommandLineParser parser(argc, argv, keys);
 	parser.about("Zeiss Interventional Imaging Research Solution");
@@ -76,13 +78,18 @@ int main(int argc, char** argv)
 	int lastSlashIndex = inputDirectory.find_last_of('/', inputDirectory.size());
 	if (lastSlashIndex < (int)inputDirectory.size() - 1)
 		inputDirectory += "/";
+	//get the path to the CAD model point clouds
+	std::replace(modelPath.begin(), modelPath.end(), '\\', '/');
+	lastSlashIndex = modelPath.find_last_of('/', modelPath.size());
+	if (lastSlashIndex < (int)modelPath.size() - 1)
+		inputDirectory += "/";
 
 	char search_path[300];
 	WIN32_FIND_DATA fd;
 	sprintf_s(search_path, "%s*.bmp", inputDirectory.c_str());
 	HANDLE hFind = ::FindFirstFile(search_path, &fd);
 
-	//count the number of pictures in the folder
+	//count the number of OCT frames in the folder
 	int count = 0;
 	if (hFind != INVALID_HANDLE_VALUE)
 	{
@@ -98,18 +105,77 @@ int main(int argc, char** argv)
 		::FindClose(hFind);
 	}
 
-	//load CAD model (.stl)
-	pcl::PolygonMesh::Ptr CAD_model(new pcl::PolygonMesh);
-	pcl::io::loadPolygonFileSTL(modelPath, *CAD_model);
-	pcl::fromPCLPointCloud2(CAD_model->cloud, *CAD_model_cloud_ptr);
+	sprintf_s(search_path, "%s*.pcd", modelPath.c_str());
+	hFind = ::FindFirstFile(search_path, &fd);
+	//count the number of view point clouds in the folder
+	int viewCount = 0;
+	if (hFind != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
 
+				viewCount++;
+
+			}
+		} while (::FindNextFile(hFind, &fd));
+		::FindClose(hFind);
+	}
+
+
+
+
+
+	//load CAD models
+	int minFrameNumber = 0;
+	int maxFrameNumber = viewCount;
+	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> CAD_model_views;
+	std::vector<pcl::PointCloud<pcl::Normal>::Ptr> normals_of_views;
+	std::vector<pcl::PointCloud<pcl::VFHSignature308>::Ptr> cvfh_descriptors_of_views;
+	std::vector<pcl::PointCloud<pcl::Histogram<90>>::Ptr> crh_descriptors_of_views;
+	std::vector<Eigen::Vector4f> centroids_of_views;
+	for (int number = minFrameNumber; number < maxFrameNumber; number++)
+	{
+		//get the next frame
+		std::stringstream filename;
+		filename << number << ".pcd";
+		if (pcl::io::loadPCDFile<pcl::PointXYZ>(modelPath, *CAD_model_cloud_ptr) != 0)
+		{
+			return -1;
+		}
+		CAD_model_views.push_back(CAD_model_cloud_ptr);
+
+		//compute normals
+		pcl::PointCloud<pcl::Normal>::Ptr normals = computeNormals(CAD_model_cloud_ptr);
+		normals_of_views.push_back(normals);
+
+		//compute centroid
+		Eigen::Vector4f centroid;
+		pcl::compute3DCentroid(*CAD_model_cloud_ptr, centroid);
+		centroids_of_views.push_back(centroid);
+
+		// compute the clustered viewpoint feature histogram
+		pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors = computeCVFH(CAD_model_cloud_ptr, normals);
+		cvfh_descriptors_of_views.push_back(cvfh_descriptors);
+
+		// compute the camera roll histogram
+		pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(CAD_model_cloud_ptr, normals, centroid);
+		crh_descriptors_of_views.push_back(crh_descriptors);
+	}
+	//show last loaded view in viewer
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> CADviewer = simpleVis(CAD_model_cloud_ptr);
 	CADviewer->spin();
 
 
+
+
+
+
+
 	//process OCT frames
-	int minFrameNumber = 0;
-	int maxFrameNumber = count;
+	minFrameNumber = 0;
+	maxFrameNumber = count;
 
 	std::string filename = "";
 	//	go through all frames
@@ -166,83 +232,72 @@ int main(int argc, char** argv)
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = simpleVis(point_cloud_ptr);
 	viewer->spin();
 
-	// Estimate the normals.
-	pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
-	pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normalEstimation;
-	normalEstimation.setInputCloud(point_cloud_ptr);
-	normalEstimation.setRadiusSearch(0.03);
-	pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
-	normalEstimation.setSearchMethod(kdtree);
-	normalEstimation.compute(*normals);
+	//compute normals
+	pcl::PointCloud<pcl::Normal>::Ptr normals = computeNormals(point_cloud_ptr);
 
 	//compute centroid
 	Eigen::Vector4f centroid;
 	pcl::compute3DCentroid(*point_cloud_ptr, centroid);
 
 	// compute the clustered viewpoint feature histogram
-	pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors(new pcl::PointCloud<pcl::VFHSignature308>);
-	pcl::CVFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::VFHSignature308> cvfh;
-	cvfh.setInputCloud(point_cloud_ptr);
-	cvfh.setInputNormals(normals);
-	cvfh.setSearchMethod(kdtree);
-	cvfh.setEPSAngleThreshold(5.0 / 180.0 * M_PI); // 5 degrees.
-	cvfh.setCurvatureThreshold(1.0);
-	cvfh.setNormalizeBins(false);
-	cvfh.compute(*cvfh_descriptors);
+	pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors = computeCVFH(point_cloud_ptr, normals);
 
 	// compute the camera roll histogram
-	pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors(new pcl::PointCloud<pcl::Histogram<90>>);
-	pcl::CRHEstimation<pcl::PointXYZ, pcl::Normal, pcl::Histogram<90>> crh;
-	crh.setInputCloud(point_cloud_ptr);
-	crh.setInputNormals(normals); 
-	crh.setCentroid(centroid);
-	crh.compute(*crh_descriptors);
+	pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(point_cloud_ptr, normals, centroid);
 
-	// compute the roll angle
-	pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
-	alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_cloud_ptr);
-	// CRHAlignment works with Vector3f, not Vector4f.
-	//Eigen::Vector3f viewCentroid3f(CADCentroid[0], CADCentroid[1], CADCentroid[2]);
-	//Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
-	//alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
 
-	//// Compute the roll angle(s).
-	//std::vector<float> angles;
-	//alignment.computeRollAngle(*crh_descriptors, *CAD_crh_descriptors, angles);
 
-	//if (angles.size() > 0)
-	//{
-	//	std::cout << "List of angles where the histograms correlate:" << std::endl;
 
-	//	for (int i = 0; i < angles.size(); i++)
-	//	{
-	//		std::cout << "\t" << angles.at(i) << " degrees." << std::endl;
-	//	}
-	//}
 
-	// plot the histograms
-	pcl::visualization::PCLPlotter plotter;
-	plotter.addFeatureHistogram(*cvfh_descriptors, 308);
-	plotter.plot();
-	pcl::visualization::PCLPlotter plotter2;
-	plotter2.addFeatureHistogram(*crh_descriptors, 308);
-	plotter2.plot();
 
-	//perform iterative closest point
-	pcl::PointCloud<pcl::PointXYZ>::Ptr finalCloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> registration;
-	registration.setInputSource(CAD_model_cloud_ptr);
-	registration.setInputTarget(point_cloud_ptr);
+	//match cloud with precomputed views to find nearest neighbours
 
-	registration.align(*finalCloud);
-	if (registration.hasConverged())
-	{
-		std::cout << "ICP converged." << std::endl
-			<< "The score is " << registration.getFitnessScore() << std::endl;
-		std::cout << "Transformation matrix:" << std::endl;
-		std::cout << registration.getFinalTransformation() << std::endl;
+	for (int i = 0; i < CAD_model_views.size(); i++) {
+		// compute the roll angle between the computed cloud and the precomputed views TODO: Loop
+		pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
+		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_cloud_ptr);
+		// CRHAlignment works with Vector3f, not Vector4f.
+		Eigen::Vector3f viewCentroid3f(centroids_of_views[i][0], centroids_of_views[i][1], centroids_of_views[i][2]);
+		Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
+		alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
+
+		// Compute the roll angle(s).
+		std::vector<float> angles;
+		alignment.computeRollAngle(*crh_descriptors, *crh_descriptors_of_views[i], angles);
+
+		if (angles.size() > 0)
+		{
+			std::cout << "List of angles where the histograms correlate:" << std::endl;
+
+			for (int i = 0; i < angles.size(); i++)
+			{
+				std::cout << "\t" << angles.at(i) << " degrees." << std::endl;
+			}
+		}
+
+		// plot the histograms
+		/*pcl::visualization::PCLPlotter plotter;
+		plotter.addFeatureHistogram(*cvfh_descriptors, 308);
+		plotter.plot();
+		pcl::visualization::PCLPlotter plotter2;
+		plotter2.addFeatureHistogram(*crh_descriptors, 308);
+		plotter2.plot();*/
+
+		//perform iterative closest point
+		pcl::PointCloud<pcl::PointXYZ>::Ptr finalCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> registration;
+		registration.setInputSource(CAD_model_views[i]);
+		registration.setInputTarget(point_cloud_ptr);
+
+		registration.align(*finalCloud);
+		if (registration.hasConverged())
+		{
+			std::cout << "ICP converged." << std::endl
+				<< "The score is " << registration.getFitnessScore() << std::endl;
+			std::cout << "Transformation matrix:" << std::endl;
+			std::cout << registration.getFinalTransformation() << std::endl;
+		}
 	}
-
 	return 0;
 }
 
@@ -293,4 +348,42 @@ void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::Poi
 			point_cloud_ptr->points.push_back(point);
 		}
 	}
+}
+
+// Estimate the normals.
+pcl::PointCloud<pcl::Normal>::Ptr computeNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr) {
+	pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+	pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normalEstimation;
+	normalEstimation.setInputCloud(point_cloud_ptr);
+	normalEstimation.setRadiusSearch(0.03);
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
+	normalEstimation.setSearchMethod(kdtree);
+	normalEstimation.compute(*normals);
+	return normals;
+}
+
+// compute the clustered viewpoint feature histogram
+pcl::PointCloud<pcl::VFHSignature308>::Ptr computeCVFH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals) {
+	pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors(new pcl::PointCloud<pcl::VFHSignature308>);
+	pcl::CVFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::VFHSignature308> cvfh;
+	cvfh.setInputCloud(point_cloud_ptr);
+	cvfh.setInputNormals(normals);
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
+	cvfh.setSearchMethod(kdtree);
+	cvfh.setEPSAngleThreshold(5.0 / 180.0 * M_PI); // 5 degrees.
+	cvfh.setCurvatureThreshold(1.0);
+	cvfh.setNormalizeBins(false);
+	cvfh.compute(*cvfh_descriptors);
+	return cvfh_descriptors;
+}
+
+// compute the camera roll histogram
+pcl::PointCloud<pcl::Histogram<90>>::Ptr computeCRH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals, Eigen::Vector4f centroid) {
+	pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors(new pcl::PointCloud<pcl::Histogram<90>>);
+	pcl::CRHEstimation<pcl::PointXYZ, pcl::Normal, pcl::Histogram<90>> crh;
+	crh.setInputCloud(point_cloud_ptr);
+	crh.setInputNormals(normals);
+	crh.setCentroid(centroid);
+	crh.compute(*crh_descriptors);
+	return crh_descriptors;
 }
