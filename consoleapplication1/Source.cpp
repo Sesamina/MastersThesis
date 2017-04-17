@@ -36,9 +36,11 @@
 
 #include <boost/thread/thread.hpp>
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud);
+boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud); 
+std::string getDirectoryPath(std::string path);
 void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZ>::Ptr& point_cloud_ptr, int height, int width);
 pcl::PointCloud<pcl::Normal>::Ptr computeNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr);
+int countNumberOfFilesInDirectory(std::string inputDirectory, const char* fileExtension);
 pcl::PointCloud<pcl::VFHSignature308>::Ptr computeCVFH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals); pcl::PointCloud<pcl::Histogram<90>>::Ptr computeCRH(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr, pcl::PointCloud<pcl::Normal>::Ptr normals, Eigen::Vector4f centroid);
 
 
@@ -74,58 +76,12 @@ int main(int argc, char** argv)
 	}
 
 	//get the path to the images
-	std::replace(inputDirectory.begin(), inputDirectory.end(), '\\', '/');
-	int lastSlashIndex = inputDirectory.find_last_of('/', inputDirectory.size());
-	if (lastSlashIndex < (int)inputDirectory.size() - 1)
-		inputDirectory += "/";
+	inputDirectory = getDirectoryPath(inputDirectory);
+	int count = countNumberOfFilesInDirectory(inputDirectory, "%s*.bmp");
 	//get the path to the CAD model point clouds
-	std::replace(modelPath.begin(), modelPath.end(), '\\', '/');
-	lastSlashIndex = modelPath.find_last_of('/', modelPath.size());
-	if (lastSlashIndex < (int)modelPath.size() - 1)
-		inputDirectory += "/";
-
-	char search_path[300];
-	WIN32_FIND_DATA fd;
-	sprintf_s(search_path, "%s*.bmp", inputDirectory.c_str());
-	HANDLE hFind = ::FindFirstFile(search_path, &fd);
-
-	//count the number of OCT frames in the folder
-	int count = 0;
-	if (hFind != INVALID_HANDLE_VALUE)
-	{
-		do
-		{
-			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-			{
-
-				count++;
-				
-			}
-		} while (::FindNextFile(hFind, &fd));
-		::FindClose(hFind);
-	}
-
-	sprintf_s(search_path, "%s*.pcd", modelPath.c_str());
-	hFind = ::FindFirstFile(search_path, &fd);
-	//count the number of view point clouds in the folder
-	int viewCount = 0;
-	if (hFind != INVALID_HANDLE_VALUE)
-	{
-		do
-		{
-			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-			{
-
-				viewCount++;
-
-			}
-		} while (::FindNextFile(hFind, &fd));
-		::FindClose(hFind);
-	}
-
-
-
-
+	modelPath = getDirectoryPath(modelPath);
+	int viewCount = countNumberOfFilesInDirectory(modelPath, "%s*.pcd");
+	
 
 	//load CAD models
 	int minFrameNumber = 0;
@@ -162,7 +118,19 @@ int main(int argc, char** argv)
 		// compute the camera roll histogram
 		pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(CAD_model_cloud_ptr, normals, centroid);
 		crh_descriptors_of_views.push_back(crh_descriptors);
+
 	}
+	//create FLANN matrix for later use in matching cvfhs
+	flann::Matrix<float> trainingData(new float[cvfh_descriptors_of_views.size() * cvfh_descriptors_of_views[0]->points[0].descriptorSize()], 
+		cvfh_descriptors_of_views.size(), cvfh_descriptors_of_views[0]->points[0].descriptorSize());
+
+	for (size_t i = 0; i < trainingData.rows; ++i)
+		for (size_t j = 0; j < trainingData.cols; ++j)
+			trainingData[i][j] = cvfh_descriptors_of_views[i]->points[0].histogram[j];
+
+
+
+
 	//show last loaded view in viewer
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> CADviewer = simpleVis(CAD_model_cloud_ptr);
 	CADviewer->spin();
@@ -248,15 +216,27 @@ int main(int argc, char** argv)
 
 
 
+	//get k nearest neighbours from cvfhs
+	flann::LinearIndex<flann::L2<float> > index(trainingData, flann::LinearIndexParams());
+	index.buildIndex();
+	flann::Matrix<float> pointCloudData(new float[cvfh_descriptors->points[0].descriptorSize()], 1, cvfh_descriptors->points[0].descriptorSize());
+
+	for (size_t i = 0; i < pointCloudData.rows; ++i)
+		for (size_t j = 0; j < pointCloudData.cols; ++j)
+			pointCloudData[i][j] = cvfh_descriptors->points[0].histogram[j];
+	int k = 5;
+	flann::Matrix<int> k_indices = flann::Matrix<int>(new int[k], 1, k);;
+	flann::Matrix<float> k_distances = flann::Matrix<float>(new float[k], 1, k);
+	index.knnSearch(pointCloudData, k_indices, k_distances, k, flann::SearchParams());
+
+	//TODO: get the corresponding crhs
 
 
-	//match cloud with precomputed views to find nearest neighbours
-
-	for (int i = 0; i < CAD_model_views.size(); i++) {
-		// compute the roll angle between the computed cloud and the precomputed views TODO: Loop
+	for (int i = 0; i < k; i++) {
+		// compute the roll angle between the computed cloud and the nearest neighbours
 		pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
+		//TODO: change to right pointer
 		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_cloud_ptr);
-		// CRHAlignment works with Vector3f, not Vector4f.
 		Eigen::Vector3f viewCentroid3f(centroids_of_views[i][0], centroids_of_views[i][1], centroids_of_views[i][2]);
 		Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
 		alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
@@ -386,4 +366,37 @@ pcl::PointCloud<pcl::Histogram<90>>::Ptr computeCRH(pcl::PointCloud<pcl::PointXY
 	crh.setCentroid(centroid);
 	crh.compute(*crh_descriptors);
 	return crh_descriptors;
+}
+
+// process the path to get the right format 
+std::string getDirectoryPath(std::string path) {
+	std::replace(path.begin(), path.end(), '\\', '/');
+	int lastSlashIndex = path.find_last_of('/', path.size());
+	if (lastSlashIndex < (int)path.size() - 1)
+		path += "/";
+	return path;
+}
+
+int countNumberOfFilesInDirectory(std::string inputDirectory, const char* fileExtension) {
+	char search_path[300];
+	WIN32_FIND_DATA fd;
+	sprintf_s(search_path, fileExtension, inputDirectory.c_str());
+	HANDLE hFind = ::FindFirstFile(search_path, &fd);
+
+	//count the number of OCT frames in the folder
+	int count = 0;
+	if (hFind != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
+
+				count++;
+
+			}
+		} while (::FindNextFile(hFind, &fd));
+		::FindClose(hFind);
+	}
+	return count;
 }
