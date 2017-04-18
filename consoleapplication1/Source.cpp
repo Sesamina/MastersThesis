@@ -36,7 +36,9 @@
 
 #include <boost/thread/thread.hpp>
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud); 
+#include "DistanceMetric.h"
+
+boost::shared_ptr<pcl::visualization::PCLVisualizer> simpleVis(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud);
 std::string getDirectoryPath(std::string path);
 void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::PointCloud<pcl::PointXYZ>::Ptr& point_cloud_ptr, int height, int width);
 pcl::PointCloud<pcl::Normal>::Ptr computeNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr);
@@ -49,6 +51,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr CAD_model_cloud_ptr(new pcl::PointCloud<pcl:
 
 bool waitKey = false;
 int volumeBScans = 128;
+
 
 int main(int argc, char** argv)
 {
@@ -81,7 +84,7 @@ int main(int argc, char** argv)
 	//get the path to the CAD model point clouds
 	modelPath = getDirectoryPath(modelPath);
 	int viewCount = countNumberOfFilesInDirectory(modelPath, "%s*.pcd");
-	
+
 
 	//load CAD models
 	int minFrameNumber = 0;
@@ -121,7 +124,7 @@ int main(int argc, char** argv)
 
 	}
 	//create FLANN matrix for later use in matching cvfhs
-	flann::Matrix<float> trainingData(new float[cvfh_descriptors_of_views.size() * cvfh_descriptors_of_views[0]->points[0].descriptorSize()], 
+	flann::Matrix<float> trainingData(new float[cvfh_descriptors_of_views.size() * cvfh_descriptors_of_views[0]->points[0].descriptorSize()],
 		cvfh_descriptors_of_views.size(), cvfh_descriptors_of_views[0]->points[0].descriptorSize());
 
 	for (size_t i = 0; i < trainingData.rows; ++i)
@@ -217,7 +220,7 @@ int main(int argc, char** argv)
 
 
 	//get k nearest neighbours from cvfhs
-	flann::LinearIndex<flann::L2<float> > index(trainingData, flann::LinearIndexParams());
+	flann::LinearIndex<DistanceMetric<float>> index(trainingData, flann::LinearIndexParams());
 	index.buildIndex();
 	flann::Matrix<float> pointCloudData(new float[cvfh_descriptors->points[0].descriptorSize()], 1, cvfh_descriptors->points[0].descriptorSize());
 
@@ -235,8 +238,8 @@ int main(int argc, char** argv)
 	for (int i = 0; i < k; i++) {
 		// compute the roll angle between the computed cloud and the nearest neighbours
 		pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
-		//TODO: change to right pointer
-		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_cloud_ptr);
+		//TODO: change to right pointer and right centroid
+		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_views[i]);
 		Eigen::Vector3f viewCentroid3f(centroids_of_views[i][0], centroids_of_views[i][1], centroids_of_views[i][2]);
 		Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
 		alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
@@ -305,14 +308,14 @@ void MatToPoinXYZ(cv::Mat& OpencVPointCloud, cv::Mat& labelInfo, int z, pcl::Poi
 	int labelWidth = labelInfo.at<int>(0, cv::CC_STAT_WIDTH);
 	int labelHeight = labelInfo.at<int>(0, cv::CC_STAT_HEIGHT);
 	//go through points in bounding box
-	for (int j = y; j < y+labelHeight; j++) {
+	for (int j = y; j < y + labelHeight; j++) {
 		//indicate if first point with intensity = 1 in row has been found
 		bool firstNotFound = true;
 		//position of last point with intensity = 1 in row
 		int lastPointPosition = 0;
-		for (int i = x; i < x+labelWidth; i++)
+		for (int i = x; i < x + labelWidth; i++)
 		{
-			if (OpencVPointCloud.at<uchar>(j,i) >= 1.0f){
+			if (OpencVPointCloud.at<unsigned char>(j, i) >= 1.0f) {
 				if (firstNotFound) {
 					firstNotFound = false;
 				}
@@ -400,3 +403,6 @@ int countNumberOfFilesInDirectory(std::string inputDirectory, const char* fileEx
 	}
 	return count;
 }
+
+
+
