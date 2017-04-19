@@ -33,6 +33,7 @@
 #include <pcl/features/crh.h>
 #include <pcl/recognition/crh_alignment.h>
 #include <pcl/registration/icp.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <boost/thread/thread.hpp>
 
@@ -85,6 +86,7 @@ int main(int argc, char** argv)
 	modelPath = getDirectoryPath(modelPath);
 	int viewCount = countNumberOfFilesInDirectory(modelPath, "%s*.pcd");
 
+	std::cout << "path input processed" << std::endl;
 
 	//load CAD models
 	int minFrameNumber = 0;
@@ -96,33 +98,56 @@ int main(int argc, char** argv)
 	std::vector<Eigen::Vector4f> centroids_of_views;
 	for (int number = minFrameNumber; number < maxFrameNumber; number++)
 	{
+		std::cout << "processing CAD model view " << number << std::endl;
 		//get the next frame
 		std::stringstream filename;
 		filename << number << ".pcd";
-		if (pcl::io::loadPCDFile<pcl::PointXYZ>(modelPath, *CAD_model_cloud_ptr) != 0)
+		if (pcl::io::loadPCDFile<pcl::PointXYZ>(modelPath + filename.str(), *CAD_model_cloud_ptr) != 0)
 		{
 			return -1;
 		}
-		CAD_model_views.push_back(CAD_model_cloud_ptr);
+
+		std::cout << "#points: " << CAD_model_cloud_ptr->points.size();
+		pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled(new pcl::PointCloud<pcl::PointXYZ>);
+		// create passthrough filter instance
+		pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+		
+		// set input cloud
+		voxel_grid.setInputCloud(CAD_model_cloud_ptr);
+		
+		// set cell/voxel size to 0.1 meters in each dimension
+		voxel_grid.setLeafSize(0.1, 0.1, 0.1);
+		
+		// do filtering
+		voxel_grid.filter(*downsampled);
+		std::cout << " after downsampling: " << downsampled->points.size() << std::endl;
+		CAD_model_views.push_back(downsampled);
 
 		//compute normals
-		pcl::PointCloud<pcl::Normal>::Ptr normals = computeNormals(CAD_model_cloud_ptr);
+		std::cout << "computing normals..." << std::endl;
+		pcl::PointCloud<pcl::Normal>::Ptr normals = computeNormals(downsampled);
+		std::cout << "finish normals..." << std::endl;
 		normals_of_views.push_back(normals);
 
 		//compute centroid
+		std::cout << "computing centroids..." << std::endl;
 		Eigen::Vector4f centroid;
-		pcl::compute3DCentroid(*CAD_model_cloud_ptr, centroid);
+		pcl::compute3DCentroid(*downsampled, centroid);
 		centroids_of_views.push_back(centroid);
 
 		// compute the clustered viewpoint feature histogram
-		pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors = computeCVFH(CAD_model_cloud_ptr, normals);
+		std::cout << "computing cvfh..." << std::endl;
+		pcl::PointCloud<pcl::VFHSignature308>::Ptr cvfh_descriptors = computeCVFH(downsampled, normals);
 		cvfh_descriptors_of_views.push_back(cvfh_descriptors);
 
 		// compute the camera roll histogram
-		pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(CAD_model_cloud_ptr, normals, centroid);
+		std::cout << "computing crh..." << std::endl;
+		pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(downsampled, normals, centroid);
 		crh_descriptors_of_views.push_back(crh_descriptors);
 
 	}
+	std::cout << "creating FLANN matrix..." << std::endl;
+
 	//create FLANN matrix for later use in matching cvfhs
 	flann::Matrix<float> trainingData(new float[cvfh_descriptors_of_views.size() * cvfh_descriptors_of_views[0]->points[0].descriptorSize()],
 		cvfh_descriptors_of_views.size(), cvfh_descriptors_of_views[0]->points[0].descriptorSize());
@@ -132,7 +157,7 @@ int main(int argc, char** argv)
 			trainingData[i][j] = cvfh_descriptors_of_views[i]->points[0].histogram[j];
 
 
-
+	std::cout << "finished processing CAD models." << std::endl;
 
 	//show last loaded view in viewer
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> CADviewer = simpleVis(CAD_model_cloud_ptr);
@@ -148,7 +173,6 @@ int main(int argc, char** argv)
 	minFrameNumber = 0;
 	maxFrameNumber = count;
 
-	std::string filename = "";
 	//	go through all frames
 	for (int number = minFrameNumber; number < maxFrameNumber; number++)
 	{
@@ -217,7 +241,7 @@ int main(int argc, char** argv)
 	pcl::PointCloud<pcl::Histogram<90>>::Ptr crh_descriptors = computeCRH(point_cloud_ptr, normals, centroid);
 
 
-
+	std::cout << "starting nearest neighbour computation..." << std::endl;
 
 	//get k nearest neighbours from cvfhs
 	flann::LinearIndex<DistanceMetric<float>> index(trainingData, flann::LinearIndexParams());
@@ -232,21 +256,19 @@ int main(int argc, char** argv)
 	flann::Matrix<float> k_distances = flann::Matrix<float>(new float[k], 1, k);
 	index.knnSearch(pointCloudData, k_indices, k_distances, k, flann::SearchParams());
 
-	//TODO: get the corresponding crhs
-
-
+	std::cout << "computing the roll angles..." << std::endl;
 	for (int i = 0; i < k; i++) {
 		// compute the roll angle between the computed cloud and the nearest neighbours
 		pcl::CRHAlignment<pcl::PointXYZ, 90> alignment;
-		//TODO: change to right pointer and right centroid
-		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_views[i]);
-		Eigen::Vector3f viewCentroid3f(centroids_of_views[i][0], centroids_of_views[i][1], centroids_of_views[i][2]);
+		int index = k_indices[i][0];
+		alignment.setInputAndTargetView(point_cloud_ptr, CAD_model_views[index]);
+		Eigen::Vector3f viewCentroid3f(centroids_of_views[index][0], centroids_of_views[index][1], centroids_of_views[index][2]);
 		Eigen::Vector3f clusterCentroid3f(centroid[0], centroid[1], centroid[2]);
 		alignment.setInputAndTargetCentroids(clusterCentroid3f, viewCentroid3f);
 
 		// Compute the roll angle(s).
 		std::vector<float> angles;
-		alignment.computeRollAngle(*crh_descriptors, *crh_descriptors_of_views[i], angles);
+		alignment.computeRollAngle(*crh_descriptors, *crh_descriptors_of_views[index], angles);
 
 		if (angles.size() > 0)
 		{
@@ -256,6 +278,9 @@ int main(int argc, char** argv)
 			{
 				std::cout << "\t" << angles.at(i) << " degrees." << std::endl;
 			}
+		}
+		else {
+			std::cout << "no angles where histograms correlate..." << std::endl;
 		}
 
 		// plot the histograms
@@ -267,6 +292,7 @@ int main(int argc, char** argv)
 		plotter2.plot();*/
 
 		//perform iterative closest point
+		std::cout << "starting ICP..." << std::endl;
 		pcl::PointCloud<pcl::PointXYZ>::Ptr finalCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> registration;
 		registration.setInputSource(CAD_model_views[i]);
@@ -281,6 +307,9 @@ int main(int argc, char** argv)
 			std::cout << registration.getFinalTransformation() << std::endl;
 		}
 	}
+	//TODO: sort nearest neighbours using num inliers from last ICP iteration with dist thresh of twice voxel grid size
+
+
 	return 0;
 }
 
